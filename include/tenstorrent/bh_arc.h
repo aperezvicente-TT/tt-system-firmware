@@ -49,6 +49,9 @@ typedef struct dmStaticInfo {
 	uint32_t arc_start_time;   /* Timestamp in ASIC refclk (50 MHz) */
 	uint32_t dm_init_duration; /* Duration in DMC refclk (64 MHz) */
 	uint32_t arc_hang_pc;      /* Program counter during last ARC hang */
+	uint32_t qsfp_status;      /* Per-cage QSFP-DD discovery status; see app/dmc/src/qsfp.h.
+				    * 0 when CONFIG_TT_QSFP_DISCOVERY is disabled.
+				    */
 } __packed dmStaticInfo;
 
 typedef struct cm2dmMessage {

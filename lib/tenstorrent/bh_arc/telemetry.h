@@ -494,12 +494,23 @@ typedef union {
  */
 #define TAG_FLASH_JEDEC_ID 80
 
+/** @brief QSFP-DD cage discovery status (P150a).
+ *
+ * One byte per cage, byte 0 = cage A ... byte 3 = cage D. Per-cage byte:
+ *   0x00        expander absent (no I2C response)
+ *   0x01        expander present, no module seated
+ *   0x02        module seated, CMIS 0x50 read failed
+ *   0x80 | id   module present; id = CMIS SFF-8024 identifier byte
+ * Populated by the DMC's qsfp_discover(); 0 if CONFIG_TT_QSFP_DISCOVERY is off.
+ */
+#define TAG_QSFP_STATUS 81
+
 /** @} */ /* end of telemetry_tag group */
 
 /* Not a real tag, signifies the last tag in the list.
  * MUST be incremented if new tags are defined.
  */
-#define TAG_COUNT 81
+#define TAG_COUNT 82
 
 /* Telemetry tags are at offset `tag` in the telemetry buffer */
 #define TELEM_OFFSET(tag) (tag)
@@ -529,6 +540,7 @@ int StartTelemetryTimer(void);
  */
 uint8_t TelemetrySetUpdateInterval(uint32_t interval_ms);
 void UpdateDmFwVersion(uint32_t bl_version, uint32_t app_version);
+void UpdateTelemetryQsfp(uint32_t qsfp_status);
 void UpdateTelemetryNocTranslation(bool translation_enabled);
 void UpdateTelemetryBoardPowerLimit(uint32_t power_limit);
 void UpdateTelemetryTdpLimit(uint32_t tdp_limit);

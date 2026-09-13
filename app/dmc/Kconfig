@@ -7,4 +7,14 @@ config DMC_RUN_SMBUS_TESTS
 	  Run SMBUS tests on the DMC at boot time. This can be used to verify
 	  functionality of the SMBUS interface.
 
+config TT_QSFP_DISCOVERY
+	bool "Probe QSFP-DD cages at boot"
+	depends on I2C
+	help
+	  At DMC boot, probe the four QSFP-DD cages via their per-cage TCA9554
+	  expanders on i2c1 (0x38..0x3b) for module presence, and read the CMIS
+	  Identifier byte of any seated module over the shared 0x50 management
+	  bus. Results are logged. Read-only bring-up/debug aid for P150a; not
+	  needed for normal operation.
+
 source "Kconfig.zephyr"

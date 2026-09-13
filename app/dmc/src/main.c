@@ -33,6 +33,8 @@
 #include <tenstorrent/log_backend_ringbuf.h>
 #include <tenstorrent/tt_smbus_regs.h>
 
+#include "qsfp.h"
+
 #define RESET_UNIT_ARC_PC_CORE_0 0x80030C00
 
 #define INITIAL_FAN_SPEED 35
@@ -58,7 +60,8 @@ static const struct device *const max6639_sensor_dev =
 	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(max6639_sensor));
 
 /* No mechanism for getting bl version... yet */
-static dmStaticInfo static_info = {.version = 1, .bl_version = 0, .app_version = APPVERSION};
+static dmStaticInfo static_info = {
+	.version = 1, .bl_version = 0, .app_version = APPVERSION, .qsfp_status = 0};
 
 static uint16_t max_power;
 
@@ -705,6 +708,18 @@ int main(void)
 	/* For manufacturing, keep the red LED solid on so it can be visually inspected. */
 	if (IS_ENABLED(CONFIG_TT_ASSEMBLY_TEST) && board_fault_led.port != NULL) {
 		gpio_pin_set_dt(&board_fault_led, 1);
+	}
+
+	/* Bring-up aid: probe QSFP-DD cages and log any seated modules. Runs
+	 * once here, before the periodic timers start, so it has uncontended
+	 * use of i2c1.
+	 */
+	if (IS_ENABLED(CONFIG_TT_QSFP_DISCOVERY)) {
+		/* Captured into the DMC static-info message so the SMC exposes it as
+		 * telemetry TAG_QSFP_STATUS (readable from the host over PCIe). Runs
+		 * before send_init_data() in the loop below, so the value is ready.
+		 */
+		static_info.qsfp_status = qsfp_discover();
 	}
 
 	k_timer_start(&shared_20ms_event_timer, K_MSEC(20), K_MSEC(20));
