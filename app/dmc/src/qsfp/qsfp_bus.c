@@ -24,9 +24,8 @@ const struct qsfp_cage qsfp_cages[QSFP_CAGE_COUNT] = {
 	{"D", 0x3b},
 };
 
-uint8_t qsfp_output_shadow[QSFP_CAGE_COUNT] = {
-	QSFP_OUT_IDLE, QSFP_OUT_IDLE, QSFP_OUT_IDLE, QSFP_OUT_IDLE
-};
+uint8_t qsfp_output_shadow[QSFP_CAGE_COUNT] = {QSFP_OUT_IDLE, QSFP_OUT_IDLE, QSFP_OUT_IDLE,
+					       QSFP_OUT_IDLE};
 
 K_MUTEX_DEFINE(qsfp_mutex);
 static uint8_t expanders_ready;
@@ -79,7 +78,7 @@ int qsfp_select(const struct device *bus, uint8_t cage)
 {
 	qsfp_park_all(bus);
 	return i2c_reg_write_byte(bus, qsfp_cages[cage].expander_addr, TCA9554_REG_OUTPUT,
-				   qsfp_output_shadow[cage] & ~QSFP_BIT_MODSELL);
+				  qsfp_output_shadow[cage] & ~QSFP_BIT_MODSELL);
 }
 
 void qsfp_deselect(const struct device *bus, uint8_t cage)

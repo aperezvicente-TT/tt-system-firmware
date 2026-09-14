@@ -9,7 +9,6 @@
 #include <zephyr/fff.h>
 #include <tenstorrent/tt_smbus_regs.h>
 #include <tenstorrent/qsfp_mgmt.h>
-#include <zephyr/drivers/i2c.h>
 #include <tenstorrent/smbus_target.h>
 #include "reg_mock.h"
 #include "asic_state.h"
@@ -42,16 +41,13 @@ ZTEST(smbus_target, test_qsfp_mgmt_response_validation)
 	zassert_equal(sizeof(struct qsfp_status_payload), 5);
 	zassert_equal(QSFP_MGMT_REQUEST_OP(request), QSFP_MGMT_OP_READ_PAGE);
 	zassert_equal(QSFP_MGMT_REQUEST_CAGE(request), 3);
-	zassert_equal(QSFP_MGMT_PAGE_ARG_INDEX(QSFP_MGMT_REQUEST_ARG(request)),
-		      QSFP_MGMT_PAGE_11);
+	zassert_equal(QSFP_MGMT_PAGE_ARG_INDEX(QSFP_MGMT_REQUEST_ARG(request)), QSFP_MGMT_PAGE_11);
 	zassert_equal(QSFP_MGMT_PAGE_ARG_BLOCK(QSFP_MGMT_REQUEST_ARG(request)), 6);
 	zassert_equal(QSFP_MGMT_REQUEST_TOKEN(request), 0xa5);
 	zassert_equal(QSFP_TELEM_CAGE(0x98980201U, 0), QSFP_TELEM_NO_MODULE);
 	zassert_equal(QSFP_TELEM_CAGE(0x98980201U, 1), QSFP_TELEM_CMIS_READ_FAILED);
 	zassert_equal(QSFP_TELEM_CAGE(0x98980201U, 2), QSFP_TELEM_PRESENT_ID(0x18));
-	zassert_equal(Dm2CmQsfpMgmtResponseHandler((uint8_t *)&response,
-						   sizeof(response) - 1),
-		      -1);
+	zassert_equal(Dm2CmQsfpMgmtResponseHandler((uint8_t *)&response, sizeof(response) - 1), -1);
 	response.length = QSFP_MGMT_PAYLOAD_SIZE + 1;
 	zassert_equal(Dm2CmQsfpMgmtResponseHandler((uint8_t *)&response, sizeof(response)), -1);
 	response.length = 0;

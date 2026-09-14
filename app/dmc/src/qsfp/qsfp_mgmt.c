@@ -125,8 +125,7 @@ static int qsfp_mgmt_inventory(const struct device *bus, uint8_t cage, uint8_t f
 		uint8_t packed[CMIS_APP_DESC_COUNT * 2];
 		uint8_t i;
 
-		if (qsfp_cmis_read(bus, CMIS_APP_DESC_OFF, descriptors, sizeof(descriptors)) ==
-		    0) {
+		if (qsfp_cmis_read(bus, CMIS_APP_DESC_OFF, descriptors, sizeof(descriptors)) == 0) {
 			for (i = 0; i < CMIS_APP_DESC_COUNT; i++) {
 				packed[2U * i] = descriptors[CMIS_APP_DESC_LEN * i];
 				packed[2U * i + 1U] = descriptors[CMIS_APP_DESC_LEN * i + 1U];
@@ -294,8 +293,7 @@ static int qsfp_mgmt_dom_lane(const struct device *bus, uint8_t cage, uint8_t la
 			return qsfp_page_status(cap);
 		}
 		dom_monitor_flags[cage] = upper[CMIS_P01_MONITOR_CAP_OFF] & GENMASK(2, 0);
-		dom_bias_multiplier[cage] =
-			1U << ((upper[CMIS_P01_MONITOR_CAP_OFF] >> 3) & 0x3);
+		dom_bias_multiplier[cage] = 1U << ((upper[CMIS_P01_MONITOR_CAP_OFF] >> 3) & 0x3);
 	}
 	ret = qsfp_cmis_read_page(bus, 0x11, upper);
 	(void)i2c_reg_write_byte(bus, QSFP_MODULE_I2C_ADDR, CMIS_REG_PAGE_SELECT, 0);

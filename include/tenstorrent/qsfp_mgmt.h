@@ -8,13 +8,14 @@
 #define INCLUDE_TENSTORRENT_QSFP_MGMT_H_
 
 #include <stdint.h>
+#include <zephyr/toolchain.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define QSFP_CAGE_COUNT 4U
-#define QSFP_MGMT_PAYLOAD_SIZE 20U
+#define QSFP_CAGE_COUNT          4U
+#define QSFP_MGMT_PAYLOAD_SIZE   20U
 #define QSFP_MGMT_SMC_TIMEOUT_MS 5000U
 
 /*
@@ -30,7 +31,7 @@ enum qsfp_telemetry_status {
 };
 
 #define QSFP_TELEM_CAGE(word, cage) ((uint8_t)((uint32_t)(word) >> (8U * (cage))))
-#define QSFP_TELEM_PRESENT_ID(identifier)                                                   \
+#define QSFP_TELEM_PRESENT_ID(identifier)                                                          \
 	((uint8_t)(QSFP_TELEM_PRESENT_FLAG | ((identifier) & 0x7fU)))
 
 enum qsfp_mgmt_op {
@@ -51,8 +52,8 @@ enum qsfp_mgmt_op {
  * QSFP_MGMT_PAGE_LOWER is bytes 0-127. Missing pages return UNAVAILABLE.
  */
 #define QSFP_MGMT_PAGE_ARG(page_index, block) ((uint8_t)((page_index) << 4 | (block)))
-#define QSFP_MGMT_PAGE_ARG_INDEX(arg) ((uint8_t)((arg) >> 4))
-#define QSFP_MGMT_PAGE_ARG_BLOCK(arg) ((uint8_t)((arg) & 0x0f))
+#define QSFP_MGMT_PAGE_ARG_INDEX(arg)         ((uint8_t)((arg) >> 4))
+#define QSFP_MGMT_PAGE_ARG_BLOCK(arg)         ((uint8_t)((arg) & 0x0f))
 
 enum qsfp_mgmt_page_index {
 	QSFP_MGMT_PAGE_00 = 0,
@@ -103,12 +104,12 @@ enum qsfp_mgmt_status {
  * single uint32_t payload available on CM2DM. The DMC returns the same token,
  * operation, and cage in qsfp_mgmt_response so stale replies can be ignored.
  */
-#define QSFP_MGMT_REQUEST(op, cage, arg, token)                                               \
-	((uint32_t)(op) | ((uint32_t)(cage) << 8) | ((uint32_t)(arg) << 16) |                \
+#define QSFP_MGMT_REQUEST(op, cage, arg, token)                                                    \
+	((uint32_t)(op) | ((uint32_t)(cage) << 8) | ((uint32_t)(arg) << 16) |                      \
 	 ((uint32_t)(token) << 24))
-#define QSFP_MGMT_REQUEST_OP(data) ((uint8_t)(data))
-#define QSFP_MGMT_REQUEST_CAGE(data) ((uint8_t)((data) >> 8))
-#define QSFP_MGMT_REQUEST_ARG(data) ((uint8_t)((data) >> 16))
+#define QSFP_MGMT_REQUEST_OP(data)    ((uint8_t)(data))
+#define QSFP_MGMT_REQUEST_CAGE(data)  ((uint8_t)((data) >> 8))
+#define QSFP_MGMT_REQUEST_ARG(data)   ((uint8_t)((data) >> 16))
 #define QSFP_MGMT_REQUEST_TOKEN(data) ((uint8_t)((data) >> 24))
 
 /*
@@ -123,7 +124,7 @@ struct qsfp_mgmt_response {
 	uint8_t length;
 	uint8_t reserved[3];
 	uint8_t payload[QSFP_MGMT_PAYLOAD_SIZE];
-} __attribute__((packed));
+} __packed;
 
 /** Payload returned by QSFP_MGMT_OP_STATUS. */
 struct qsfp_status_payload {
@@ -132,7 +133,7 @@ struct qsfp_status_payload {
 	uint8_t revision;
 	uint8_t power_mode;
 	uint8_t module_state;
-} __attribute__((packed));
+} __packed;
 
 struct qsfp_dom_module {
 	int16_t temperature_256c;
@@ -141,7 +142,7 @@ struct qsfp_dom_module {
 	uint8_t low_power;
 	uint8_t interrupt_asserted;
 	uint8_t reserved;
-} __attribute__((packed));
+} __packed;
 
 struct qsfp_dom_lane {
 	uint16_t tx_bias_2ua;
@@ -149,7 +150,7 @@ struct qsfp_dom_lane {
 	uint16_t rx_power_01uw;
 	uint8_t tx_bias_multiplier;
 	uint8_t monitor_flags;
-} __attribute__((packed));
+} __packed;
 
 #ifdef __cplusplus
 }
