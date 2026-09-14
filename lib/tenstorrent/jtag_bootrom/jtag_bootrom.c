@@ -361,26 +361,6 @@ void jtag_bootrom_set_cable_power_limit(struct bh_chip *chip, uint16_t power_lim
 
 void jtag_bootrom_teardown(const struct bh_chip *chip)
 {
-#ifdef CONFIG_JTAG_LOAD_BOOTROM
-	const struct device *dev = chip->config.jtag;
-	uint32_t pad = 0;
-
-	/*
-	 * PB10 is SYS JTAG TCK (also STM_I2C2 SDA). ASIC default pad control
-	 * (0x0007C5CF) enables TCK pull-down, which holds SDA low after the
-	 * MCU releases TCK. Clear PDEN and enable PUEN on TCK before Hi-Z.
-	 */
-	if (jtag_axi_read32(dev, RESET_UNIT_SYS_JTAG_PAD_CNTL_REG_ADDR, &pad) == 0) {
-		pad &= ~SYS_JTAG_TCK_PDEN;
-		pad |= SYS_JTAG_TCK_PUEN;
-		(void)jtag_axi_write32(dev, RESET_UNIT_SYS_JTAG_PAD_CNTL_REG_ADDR, pad);
-		(void)jtag_axi_read32(dev, RESET_UNIT_SYS_JTAG_PAD_CNTL_REG_ADDR, &pad);
-		printk("SYS_JTAG_PAD_CNTL=0x%08x\n", pad);
-	} else {
-		printk("SYS_JTAG_PAD_CNTL read failed\n");
-	}
-#endif
-
 	/* Just one more for good luck */
 	jtag_reset(chip->config.jtag);
 	jtag_teardown(chip->config.jtag);
