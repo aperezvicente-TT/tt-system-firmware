@@ -6,10 +6,12 @@ firmware.
 
 > **Scope / board note.** This applies to **P150A** — a single-ASIC PCIe add-in
 > card whose QSFP-DD management plane hangs off the on-card **STM32 DMC**. It is
-> **not** Galaxy. On Galaxy/UBB the cage plane is owned by a **BMC** and driven
-> over IPMI (`syseng-blackhole-bringup/.../scripts/eth/bh_glx_cable_mgmt.py`:
+> **not** Galaxy and **not** P300. On Galaxy/UBB the cage plane is owned by a
+> **BMC** and driven over IPMI
+> (`syseng-blackhole-bringup/.../scripts/eth/bh_glx_cable_mgmt.py`:
 > `ipmitool raw 0x06 0x52 …`, per-UBB bus → CPLD → PCA9548 mux → module `0xa0`).
-> None of that applies here.
+> P300 uses Samtec ARP6; DMC `i2c3` is chip1 ARC SMBus, not cages.
+> `CONFIG_TT_QSFP` is therefore `depends on` P150A only.
 >
 > ERISC firmware never touches the cages. Its `QSFP_*` strings are high-speed
 > SerDes lane maps. This interface manages module sideband and CMIS only.
@@ -126,9 +128,9 @@ protocol header.
 | `app/dmc/src/qsfp/qsfp_mgmt.c` | live host operations: status, inventory, LPMODE, RESETL, DOM, page dump |
 | `app/dmc/src/qsfp/qsfp.h` | DMC app API (`qsfp_discover`, `qsfp_poll`, `qsfp_handle_mgmt`, park/translator) |
 | `include/tenstorrent/qsfp_mgmt.h` | canonical protocol: telemetry bytes, ops, request packing, response/payload structs |
-| `app/dmc/Kconfig` | `CONFIG_TT_QSFP` (default n). `CONFIG_TT_QSFP_DISCOVERY` is a deprecated alias |
+| `app/dmc/Kconfig` | `CONFIG_TT_QSFP`: default `y` only when `BOARD_REVISION=p150a`. Hidden on P300 / other revisions so DMC never probes cages on chip1 ARC SMBus. `CONFIG_TT_QSFP_DISCOVERY` is a deprecated alias |
 | `app/dmc/src/main.c` | boot discovery, 1 s poll, CM2DM management dispatch, U1 off during JTAG |
-| `app/dmc/boards/tt_blackhole_tt_blackhole_dmc.conf` | `CONFIG_TT_QSFP=y` for P150A DMC |
+| `app/dmc/boards/tt_blackhole_tt_blackhole_dmc.conf` | Shared DMC conf (JTAG, clocks, I2C timeout, MCUBoot). Does **not** force `CONFIG_TT_QSFP`; that is P150A-only in Kconfig |
 | `boards/tenstorrent/tt_blackhole/tt_blackhole_tt_blackhole_dmc.dts` | U1 OE on PD2, held low during JTAG |
 | `scripts/qsfp.py` | unified host CLI |
 | `scripts/qsfp_lib.py` | PCIe telemetry + `TT_SMC_MSG_QSFP_MGMT` client |
@@ -291,10 +293,10 @@ cmake --build build --target fwbundle
 #   -> build/update.fwbundle
 ```
 
-Confirm management is baked in: `build/dmc/zephyr/.config` has
+Confirm management is baked in on P150A: `build/dmc/zephyr/.config` has
 `CONFIG_TT_QSFP=y`, and
 `arm-zephyr-eabi-nm build/dmc/zephyr/zephyr.elf | grep qsfp_discover` shows
-the symbol.
+the symbol. A P300 DMC configure must leave `CONFIG_TT_QSFP` unset (`n`).
 
 Host-side decoder and CLI tests do not require hardware:
 
