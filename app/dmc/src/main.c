@@ -33,7 +33,7 @@
 #include <tenstorrent/log_backend_ringbuf.h>
 #include <tenstorrent/tt_smbus_regs.h>
 
-#include "qsfp.h"
+#include "qsfp/qsfp.h"
 
 #define RESET_UNIT_ARC_PC_CORE_0 0x80030C00
 
@@ -238,6 +238,32 @@ static bool process_gddr_therm_trip(struct bh_chip *chip, uint8_t msg_id, uint32
 	return false;
 }
 
+static bool process_qsfp_mgmt(struct bh_chip *chip, uint8_t msg_id, uint32_t msg_data)
+{
+	struct qsfp_mgmt_response response = {
+		.token = QSFP_MGMT_REQUEST_TOKEN(msg_data),
+		.operation = QSFP_MGMT_REQUEST_OP(msg_data),
+		.cage = QSFP_MGMT_REQUEST_CAGE(msg_data),
+	};
+	int ret;
+
+	ARG_UNUSED(msg_id);
+	if (!IS_ENABLED(CONFIG_TT_QSFP)) {
+		response.status = QSFP_MGMT_ERR_UNAVAILABLE;
+	} else if (chip->data.performing_reset) {
+		response.status = QSFP_MGMT_ERR_BUSY;
+	} else {
+		qsfp_handle_mgmt(msg_data, &response);
+	}
+
+	ret = bharc_smbus_block_write(&chip->config.arc, CMFW_SMBUS_QSFP_MGMT_RESPONSE,
+				      sizeof(response), (uint8_t *)&response);
+	if (ret != 0) {
+		LOG_WRN("QSFP management response failed: %d", ret);
+	}
+	return false;
+}
+
 void process_cm2dm_message(struct bh_chip *chip)
 {
 	typedef bool (*msg_processor_t)(struct bh_chip *chip, uint8_t msg_id, uint32_t msg_data);
@@ -252,6 +278,7 @@ void process_cm2dm_message(struct bh_chip *chip)
 		[kCm2DmMsgTelemHeartbeatUpdate] = process_heartbeat_update,
 		[kCm2DmMsgIdLedBlink] = process_led_blink_request,
 		[kCm2DmMsgIdGddrThermTrip] = process_gddr_therm_trip,
+		[kCm2DmMsgIdQsfpMgmt] = process_qsfp_mgmt,
 	};
 
 	for (uint32_t i = 0U; i < kCm2DmMsgCount; i++) {
@@ -434,6 +461,10 @@ static void handle_therm_trip(void)
 				 * think I'm happy to eat the non-enum in that case
 				 */
 				chip->data.performing_reset = true;
+				if (IS_ENABLED(CONFIG_TT_QSFP)) {
+					qsfp_emergency_park();
+					qsfp_hold_translator_off();
+				}
 				/* Set the bus cancel following the logic of
 				 * (reset_triggered && !performing_reset)
 				 */
@@ -441,6 +472,9 @@ static void handle_therm_trip(void)
 
 				chip->data.therm_trip_count++;
 				bh_chip_reset_chip(chip, true);
+				if (IS_ENABLED(CONFIG_TT_QSFP)) {
+					qsfp_enable_translator();
+				}
 
 				/* Set the bus cancel following the logic of
 				 * (reset_triggered && !performing_reset)
@@ -478,7 +512,14 @@ static void handle_watchdog_reset(void)
 			}
 
 			chip->data.performing_reset = true;
+			if (IS_ENABLED(CONFIG_TT_QSFP)) {
+				qsfp_emergency_park();
+				qsfp_hold_translator_off();
+			}
 			bh_chip_reset_chip(chip, true);
+			if (IS_ENABLED(CONFIG_TT_QSFP)) {
+				qsfp_enable_translator();
+			}
 			/* Clear bus transfer cancel flag */
 			bh_chip_cancel_bus_transfer_clear(chip);
 
@@ -492,6 +533,10 @@ static void handle_perst(void)
 	ARRAY_FOR_EACH_BH_CHIP(chip) {
 		if (atomic_set(&chip->data.trigger_reset, false)) {
 			chip->data.performing_reset = true;
+			if (IS_ENABLED(CONFIG_TT_QSFP)) {
+				qsfp_emergency_park();
+				qsfp_hold_translator_off();
+			}
 			chip->data.last_cm2dm_seq_num_valid = false;
 			/*
 			 * Set the bus cancel following the logic of (reset_triggered &&
@@ -505,6 +550,9 @@ static void handle_perst(void)
 			jtag_bootrom_soft_reset_arc(chip);
 			jtag_bootrom_teardown(chip);
 			bharc_enable_i2cbus(&chip->config.arc);
+			if (IS_ENABLED(CONFIG_TT_QSFP)) {
+				qsfp_enable_translator();
+			}
 
 			/*
 			 * Set the bus cancel following the logic of (reset_triggered &&
@@ -609,6 +657,47 @@ static void board_power_update_expired(struct k_timer *timer)
 }
 static K_TIMER_DEFINE(board_power_update_timer, board_power_update_expired, NULL);
 
+static void qsfp_poll_expired(struct k_timer *timer)
+{
+	ARG_UNUSED(timer);
+	tt_event_post(TT_EVENT_QSFP_POLL);
+}
+static K_TIMER_DEFINE(qsfp_poll_timer, qsfp_poll_expired, NULL);
+
+static bool qsfp_reset_in_progress(void)
+{
+	ARRAY_FOR_EACH_BH_CHIP(chip) {
+		if (chip->data.performing_reset) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static void qsfp_publish_status(void)
+{
+	uint32_t st;
+	int ret;
+
+	if (!IS_ENABLED(CONFIG_TT_QSFP) || qsfp_reset_in_progress()) {
+		return;
+	}
+
+	st = qsfp_poll();
+	if (st == static_info.qsfp_status) {
+		return;
+	}
+
+	LOG_INF("QSFP: telemetry 0x%08x -> 0x%08x", static_info.qsfp_status, st);
+	static_info.qsfp_status = st;
+	ARRAY_FOR_EACH_BH_CHIP(chip) {
+		ret = bh_chip_set_static_info(chip, &static_info);
+		if (ret != 0) {
+			LOG_WRN("QSFP: failed to publish telemetry to SMC: %d", ret);
+		}
+	}
+}
+
 int main(void)
 {
 	int ret;
@@ -672,6 +761,10 @@ int main(void)
 	 */
 	max_power = detect_max_power();
 
+	if (IS_ENABLED(CONFIG_TT_QSFP)) {
+		qsfp_hold_translator_off();
+	}
+
 	if (IS_ENABLED(CONFIG_JTAG_LOAD_BOOTROM)) {
 		ARRAY_FOR_EACH_BH_CHIP(chip) {
 			ret = jtag_bootrom_init(chip);
@@ -712,9 +805,9 @@ int main(void)
 
 	/* Bring-up aid: probe QSFP-DD cages and log any seated modules. Runs
 	 * once here, before the periodic timers start, so it has uncontended
-	 * use of i2c1.
+	 * use of MCU_I2C0 (shared with the SMC SMBus target).
 	 */
-	if (IS_ENABLED(CONFIG_TT_QSFP_DISCOVERY)) {
+	if (IS_ENABLED(CONFIG_TT_QSFP)) {
 		/* Captured into the DMC static-info message so the SMC exposes it as
 		 * telemetry TAG_QSFP_STATUS (readable from the host over PCIe). Runs
 		 * before send_init_data() in the loop below, so the value is ready.
@@ -724,6 +817,9 @@ int main(void)
 
 	k_timer_start(&shared_20ms_event_timer, K_MSEC(20), K_MSEC(20));
 	k_timer_start(&board_power_update_timer, K_MSEC(1), K_MSEC(1));
+	if (IS_ENABLED(CONFIG_TT_QSFP)) {
+		k_timer_start(&qsfp_poll_timer, K_MSEC(1000), K_MSEC(1000));
+	}
 
 	while (true) {
 		uint32_t events = tt_event_wait(TT_EVENT_ANY, K_FOREVER);
@@ -754,6 +850,10 @@ int main(void)
 
 		if (events & (TT_EVENT_LOGS_TO_SMC | TT_EVENT_WAKE)) {
 			send_logs_to_smc();
+		}
+
+		if (events & TT_EVENT_QSFP_POLL) {
+			qsfp_publish_status();
 		}
 	}
 

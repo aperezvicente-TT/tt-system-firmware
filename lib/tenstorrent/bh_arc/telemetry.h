@@ -499,9 +499,10 @@ typedef union {
  * One byte per cage, byte 0 = cage A ... byte 3 = cage D. Per-cage byte:
  *   0x00        expander absent (no I2C response)
  *   0x01        expander present, no module seated
- *   0x02        module seated, CMIS 0x50 read failed
- *   0x80 | id   module present; id = CMIS SFF-8024 identifier byte
- * Populated by the DMC's qsfp_discover(); 0 if CONFIG_TT_QSFP_DISCOVERY is off.
+ *   0x02        module seated, identifier read at 0x50 failed
+ *   0x03        MCU_I2C0 stuck (all four bytes)
+ *   0x80 | id   module present; id = SFF-8024 identifier byte
+ * Populated by the DMC's qsfp_discover(); 0 if CONFIG_TT_QSFP is off.
  */
 #define TAG_QSFP_STATUS 81
 

@@ -210,13 +210,17 @@ enum CMFWSMBusReg {
 	/**
 	 * @brief Write dmStaticInfo struct including DMFW version.
 	 *
-	 * Input (24 bytes, little-endian), a @ref dmStaticInfo of six uint32 fields:
+	 * Input (28 bytes, little-endian), a @ref dmStaticInfo of seven uint32 fields:
 	 * - bytes 0-3:   version (must be non-zero, else the write is rejected).
 	 * - bytes 4-7:   bl_version (bootloader version).
 	 * - bytes 8-11:  app_version (application version).
 	 * - bytes 12-15: arc_start_time (timestamp in ASIC refclk @ 50 MHz).
 	 * - bytes 16-19: dm_init_duration (duration in DMC refclk @ 64 MHz).
 	 * - bytes 20-23: arc_hang_pc (PC of last ARC hang; recorded only if non-zero).
+	 * - bytes 24-27: qsfp_status (one discovery byte per QSFP-DD cage).
+	 *
+	 * For compatibility, the SMC also accepts the legacy 24-byte form and
+	 * leaves TAG_QSFP_STATUS unchanged.
 	 */
 	CMFW_SMBUS_DM_STATIC_INFO = 0x20,
 	/**
@@ -298,6 +302,13 @@ enum CMFWSMBusReg {
 	 * this ping request.
 	 */
 	CMFW_SMBUS_PING_V2 = 0x2A,
+	/**
+	 * @brief Completed QSFP-DD management response from DMC.
+	 *
+	 * Input (28 bytes): a @ref qsfp_mgmt_response. The SMC validates its
+	 * token and returns it to the host request waiting on TT_SMC_MSG_QSFP_MGMT.
+	 */
+	CMFW_SMBUS_QSFP_MGMT_RESPONSE = 0x2B,
 	/**
 	 * @brief Test read from CMFW scratch register.
 	 *

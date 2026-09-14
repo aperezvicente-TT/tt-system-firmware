@@ -17,6 +17,17 @@
 		zephyr,flash = &flash0;
 		zephyr,code-partition = &slot0_partition;
 	};
+
+	/*
+	 * MCU_CONN_I2C_EN (PD2) is OE for FXMA2102 U1, which joins the QSFP-DD
+	 * cages to MCU_I2C0. That net is the DMC's i2c3 (STM_I2C3 through the
+	 * stuffed R4334/R4335) and ASIC ball D32/BP_I2C. The STM_I2C2 path to
+	 * MCU_I2C0 (R4324/R4325) is not stuffed on P150A.
+	 */
+	qsfp_i2c_en: qsfp-i2c-en {
+		compatible = "zephyr,gpio-line";
+		gpios = <&gpiod 2 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 #include "tt_blackhole_dmc.dtsi"
@@ -67,10 +78,6 @@
 	status = "disabled";
 };
 
-/*
- * To do- GPIOx3-GPIOx6 should be enabled for QSFP support, but they are not
- * currently detected on a P150a board.
- */
 &gpiox3 {
 	status = "disabled";
 };
@@ -93,6 +100,15 @@
 
 &gpiox8 {
 	status = "disabled";
+};
+
+&gpiod {
+	qsfp-i2c-en-hog {
+		gpio-hog;
+		gpios = <2 GPIO_ACTIVE_HIGH>;
+		output-low;
+		line-name = "qsfp-i2c-enable";
+	};
 };
 
 &smbus3 {

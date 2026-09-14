@@ -23,6 +23,7 @@ typedef enum {
 	kCm2DmMsgIdForcedFanSpeedUpdate = 7,
 	kCm2DmMsgIdLedBlink = 8,
 	kCm2DmMsgIdGddrThermTrip = 9,
+	kCm2DmMsgIdQsfpMgmt = 10,
 	kCm2DmMsgCount
 } Cm2DmMsgId;
 
@@ -49,8 +50,8 @@ typedef struct dmStaticInfo {
 	uint32_t arc_start_time;   /* Timestamp in ASIC refclk (50 MHz) */
 	uint32_t dm_init_duration; /* Duration in DMC refclk (64 MHz) */
 	uint32_t arc_hang_pc;      /* Program counter during last ARC hang */
-	uint32_t qsfp_status;      /* Per-cage QSFP-DD discovery status; see app/dmc/src/qsfp.h.
-				    * 0 when CONFIG_TT_QSFP_DISCOVERY is disabled.
+	uint32_t qsfp_status;      /* Per-cage QSFP-DD discovery status; see qsfp_mgmt.h.
+				    * 0 when CONFIG_TT_QSFP is disabled.
 				    */
 } __packed dmStaticInfo;
 
