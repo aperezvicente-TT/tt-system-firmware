@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include <tenstorrent/qsfp_mgmt.h>
 
+#ifdef CONFIG_TT_QSFP
+
 /*
  * Probe the four P150A QSFP-DD cages on MCU_I2C0 (the DMC's i2c3): report
  * per-cage module presence and, for any seated module, the CMIS Identifier.
@@ -40,5 +42,40 @@ void qsfp_hold_translator_off(void);
 
 /* Enable U1 so the cages join MCU_I2C0. */
 void qsfp_enable_translator(void);
+
+#else
+
+static inline uint32_t qsfp_discover(void)
+{
+	return 0;
+}
+
+static inline uint32_t qsfp_poll(void)
+{
+	return 0;
+}
+
+static inline void qsfp_handle_mgmt(uint32_t request, struct qsfp_mgmt_response *response)
+{
+	response->token = QSFP_MGMT_REQUEST_TOKEN(request);
+	response->operation = QSFP_MGMT_REQUEST_OP(request);
+	response->cage = QSFP_MGMT_REQUEST_CAGE(request);
+	response->status = QSFP_MGMT_ERR_UNAVAILABLE;
+	response->length = 0;
+}
+
+static inline void qsfp_emergency_park(void)
+{
+}
+
+static inline void qsfp_hold_translator_off(void)
+{
+}
+
+static inline void qsfp_enable_translator(void)
+{
+}
+
+#endif /* CONFIG_TT_QSFP */
 
 #endif /* APP_DMC_QSFP_H_ */

@@ -174,8 +174,12 @@ static int qsfp_mgmt_inventory(const struct device *bus, uint8_t cage, uint8_t f
 	}
 
 	if (src != NULL) {
-		while (len > 0 && src[len - 1] == ' ') {
-			len--;
+		if (field == QSFP_INV_VENDOR_NAME || field == QSFP_INV_VENDOR_PN ||
+		    field == QSFP_INV_VENDOR_REV || field == QSFP_INV_VENDOR_SN ||
+		    field == QSFP_INV_DATE_CODE) {
+			while (len > 0 && src[len - 1] == ' ') {
+				len--;
+			}
 		}
 		qsfp_response_copy(response, src, len);
 		ret = QSFP_MGMT_OK;
@@ -225,6 +229,7 @@ static int qsfp_mgmt_reset(const struct device *bus, uint8_t cage)
 	}
 	k_msleep(10);
 	if (qsfp_write_output(bus, cage, saved | QSFP_BIT_RESETL) != 0) {
+		qsfp_output_shadow[cage] = saved | QSFP_BIT_RESETL;
 		return QSFP_MGMT_ERR_I2C;
 	}
 	qsfp_dom_cache_invalidate(cage);

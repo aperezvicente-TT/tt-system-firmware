@@ -7,6 +7,10 @@ include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/git_version.cmake)
 
 project(dmc)
 
-FILE(GLOB app_sources src/*.c src/qsfp/*.c)
+FILE(GLOB app_sources src/*.c)
 target_sources(app PRIVATE ${app_sources})
+if(CONFIG_TT_QSFP)
+  FILE(GLOB qsfp_sources src/qsfp/*.c)
+  target_sources(app PRIVATE ${qsfp_sources})
+endif()
 target_include_directories(app PRIVATE ../../include)

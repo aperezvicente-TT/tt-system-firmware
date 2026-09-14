@@ -21,6 +21,7 @@ static uint32_t qsfp_probe(bool log_discovery)
 	const struct device *bus = qsfp_session_begin();
 	uint32_t status = 0;
 	uint8_t responsive = 0;
+	static uint8_t last_identifier[QSFP_CAGE_COUNT];
 
 	if (bus == NULL) {
 		LOG_ERR("QSFP: i2c3 (MCU_I2C0) not ready, skipping discovery");
@@ -45,6 +46,7 @@ static uint32_t qsfp_probe(bool log_discovery)
 
 		if ((pins & QSFP_BIT_MODPRSL) != 0) {
 			qsfp_dom_cache_invalidate(i);
+			last_identifier[i] = 0;
 			status |= (uint32_t)QSFP_TELEM_NO_MODULE << (8 * i);
 			if (log_discovery) {
 				LOG_INF("QSFP %s: expander 0x%02x present, no module", cage->name,
@@ -53,18 +55,34 @@ static uint32_t qsfp_probe(bool log_discovery)
 			continue;
 		}
 
-		(void)qsfp_select(bus, i);
+		if (qsfp_select(bus, i) != 0) {
+			qsfp_deselect(bus, i);
+			qsfp_dom_cache_invalidate(i);
+			last_identifier[i] = 0;
+			status |= (uint32_t)QSFP_TELEM_CMIS_READ_FAILED << (8 * i);
+			if (log_discovery) {
+				LOG_WRN("QSFP %s: module seated, select failed", cage->name);
+			}
+			continue;
+		}
 		k_msleep(1);
 		ident_ret = qsfp_cmis_read_identity(bus, &identifier, &revision);
 		qsfp_deselect(bus, i);
 
 		if (ident_ret != 0) {
+			qsfp_dom_cache_invalidate(i);
+			last_identifier[i] = 0;
 			status |= (uint32_t)QSFP_TELEM_CMIS_READ_FAILED << (8 * i);
 			if (log_discovery) {
 				LOG_WRN("QSFP %s: module seated, identifier read failed",
 					cage->name);
 			}
 			continue;
+		}
+
+		if (last_identifier[i] != identifier) {
+			qsfp_dom_cache_invalidate(i);
+			last_identifier[i] = identifier;
 		}
 
 		status |= (uint32_t)QSFP_TELEM_PRESENT_ID(identifier) << (8 * i);

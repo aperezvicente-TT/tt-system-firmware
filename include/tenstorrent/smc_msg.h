@@ -170,7 +170,7 @@ enum tt_smc_msg {
 	TT_SMC_MSG_TT_PCIE_LOG = 0xC7,
 
 	/** @brief Runtime QSFP-DD cage management request */
-	TT_SMC_MSG_QSFP_MGMT = 0xBF,
+	TT_SMC_MSG_QSFP_MGMT = 0xC8,
 };
 
 /** @brief Enumeration of characterization submessage IDs */
