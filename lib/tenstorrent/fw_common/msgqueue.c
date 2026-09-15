@@ -54,6 +54,8 @@
 #define MSG_ERROR_REPLY 0xff
 
 BUILD_ASSERT(sizeof(union request) <= (sizeof(uint32_t) * REQUEST_MSG_LEN));
+BUILD_ASSERT(TT_SMC_MSG_QSFP_MGMT < CONFIG_TT_MSGQUEUE_NUM_MSG_CODES,
+	     "Increase CONFIG_TT_MSGQUEUE_NUM_MSG_CODES for new SMC messages");
 BUILD_ASSERT(DT_NODE_HAS_STATUS(MSGQUEUE_INFO_NODE, okay),
 	     "TT_MSGQUEUE requires msgqueue_info status okay");
 BUILD_ASSERT(!(MSGQUEUE_HAS_MBOX && MSGQUEUE_HAS_IRQS),
