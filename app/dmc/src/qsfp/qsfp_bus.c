@@ -66,32 +66,86 @@ int qsfp_write_output(const struct device *bus, uint8_t cage, uint8_t value)
 	return ret;
 }
 
-static void qsfp_park_all(const struct device *bus)
+static int qsfp_park_all(const struct device *bus)
 {
+	int ret = 0;
+	int err;
+
 	ARRAY_FOR_EACH(qsfp_cages, i) {
-		(void)i2c_reg_write_byte(bus, qsfp_cages[i].expander_addr, TCA9554_REG_OUTPUT,
+		if ((expanders_ready & BIT(i)) == 0) {
+			continue;
+		}
+		err = i2c_reg_write_byte(bus, qsfp_cages[i].expander_addr, TCA9554_REG_OUTPUT,
 					 qsfp_output_shadow[i] | QSFP_BIT_MODSELL);
+		if (err != 0) {
+			LOG_ERR("QSFP %s: deselect failed: %d", qsfp_cages[i].name, err);
+			if (ret == 0) {
+				ret = err;
+			}
+		}
 	}
+
+	return ret;
+}
+
+/* Deselect every known cage. If an expander NACKs, it may still hold ModSelL
+ * low on the shared 0x50 EEPROM, so isolate the translator rather than
+ * selecting another cage.
+ */
+static int qsfp_repark(const struct device *bus)
+{
+	int ret = qsfp_park_all(bus);
+
+	if (ret == 0) {
+		return 0;
+	}
+
+	LOG_ERR("QSFP: aborting access, a cage may still be selected (%d)", ret);
+	(void)qsfp_recover(bus);
+	if (qsfp_park_all(bus) == 0) {
+		return 0;
+	}
+
+	qsfp_hold_translator_off();
+	expanders_ready = 0;
+	return ret;
 }
 
 int qsfp_select(const struct device *bus, uint8_t cage)
 {
-	qsfp_park_all(bus);
+	int ret;
+
+	if (cage >= ARRAY_SIZE(qsfp_cages)) {
+		return -EINVAL;
+	}
+
+	ret = qsfp_repark(bus);
+	if (ret != 0) {
+		return ret;
+	}
+	if ((expanders_ready & BIT(cage)) == 0) {
+		return -ENODEV;
+	}
+
 	return i2c_reg_write_byte(bus, qsfp_cages[cage].expander_addr, TCA9554_REG_OUTPUT,
 				  qsfp_output_shadow[cage] & ~QSFP_BIT_MODSELL);
 }
 
 void qsfp_deselect(const struct device *bus, uint8_t cage)
 {
-	(void)i2c_reg_write_byte(bus, qsfp_cages[cage].expander_addr, TCA9554_REG_OUTPUT,
-				 qsfp_output_shadow[cage] | QSFP_BIT_MODSELL);
+	if (cage >= ARRAY_SIZE(qsfp_cages) || (expanders_ready & BIT(cage)) == 0) {
+		return;
+	}
+	if (i2c_reg_write_byte(bus, qsfp_cages[cage].expander_addr, TCA9554_REG_OUTPUT,
+			       qsfp_output_shadow[cage] | QSFP_BIT_MODSELL) != 0) {
+		(void)qsfp_repark(bus);
+	}
 }
 
 static int qsfp_init_expanders(const struct device *bus)
 {
 	if (expanders_ready == GENMASK(ARRAY_SIZE(qsfp_cages) - 1, 0)) {
-		qsfp_park_all(bus);
-		return 0;
+		return qsfp_park_all(bus);
 	}
 
 	ARRAY_FOR_EACH(qsfp_cages, i) {
@@ -107,8 +161,11 @@ static int qsfp_init_expanders(const struct device *bus)
 			expanders_ready |= BIT(i);
 		}
 	}
-	qsfp_park_all(bus);
-	return expanders_ready != 0 ? 0 : -ENODEV;
+
+	if (expanders_ready == 0) {
+		return -ENODEV;
+	}
+	return qsfp_park_all(bus);
 }
 
 const struct device *qsfp_session_begin(void)
@@ -121,13 +178,15 @@ const struct device *qsfp_session_begin(void)
 		return NULL;
 	}
 	qsfp_enable_translator();
-	(void)qsfp_init_expanders(bus);
+	if (qsfp_init_expanders(bus) != 0) {
+		(void)qsfp_repark(bus);
+	}
 	return bus;
 }
 
 void qsfp_session_end(const struct device *bus)
 {
-	qsfp_park_all(bus);
+	(void)qsfp_repark(bus);
 	k_mutex_unlock(&qsfp_mutex);
 }
 
@@ -149,6 +208,6 @@ void qsfp_emergency_park(void)
 	if (!device_is_ready(bus) || k_mutex_lock(&qsfp_mutex, K_NO_WAIT) != 0) {
 		return;
 	}
-	qsfp_park_all(bus);
+	(void)qsfp_repark(bus);
 	k_mutex_unlock(&qsfp_mutex);
 }
