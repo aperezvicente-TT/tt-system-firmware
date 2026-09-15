@@ -49,6 +49,9 @@ struct bh_chip_data {
 	 */
 	bool arc_needs_init_msg;
 
+	/* TAG_QSFP_STATUS has not been accepted by this SMC yet. */
+	bool qsfp_status_pending;
+
 	unsigned int bus_cancel_flag;
 
 	/*

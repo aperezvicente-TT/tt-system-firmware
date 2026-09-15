@@ -585,8 +585,10 @@ static void send_init_data(void)
 			    bh_chip_run_smbus_tests(chip) == 0) {
 				chip->data.arc_needs_init_msg = false;
 				if (IS_ENABLED(CONFIG_TT_QSFP)) {
-					/* Best-effort: older SMCs NACK this command. */
-					(void)bh_chip_set_qsfp_status(chip, qsfp_status);
+					chip->data.qsfp_status_pending = true;
+					if (bh_chip_set_qsfp_status(chip, qsfp_status) == 0) {
+						chip->data.qsfp_status_pending = false;
+					}
 				}
 			}
 		}
@@ -682,25 +684,42 @@ static void qsfp_publish_status(void)
 {
 	uint32_t st;
 	int ret;
+	bool pending = false;
 
 	if (!IS_ENABLED(CONFIG_TT_QSFP) || qsfp_reset_in_progress()) {
 		return;
 	}
 
 	st = qsfp_poll();
-	if (st == qsfp_status) {
+	if (st != qsfp_status) {
+		LOG_INF("QSFP: telemetry 0x%08x -> 0x%08x", qsfp_status, st);
+		qsfp_status = st;
+		ARRAY_FOR_EACH_BH_CHIP(chip) {
+			chip->data.qsfp_status_pending = true;
+		}
+	}
+
+	ARRAY_FOR_EACH_BH_CHIP(chip) {
+		if (chip->data.qsfp_status_pending) {
+			pending = true;
+			break;
+		}
+	}
+	if (!pending) {
 		return;
 	}
 
-	LOG_INF("QSFP: telemetry 0x%08x -> 0x%08x", qsfp_status, st);
 	ARRAY_FOR_EACH_BH_CHIP(chip) {
-		ret = bh_chip_set_qsfp_status(chip, st);
+		if (!chip->data.qsfp_status_pending) {
+			continue;
+		}
+		ret = bh_chip_set_qsfp_status(chip, qsfp_status);
 		if (ret != 0) {
 			LOG_WRN("QSFP: failed to publish telemetry to SMC: %d", ret);
-			return;
+			continue;
 		}
+		chip->data.qsfp_status_pending = false;
 	}
-	qsfp_status = st;
 }
 
 int main(void)
