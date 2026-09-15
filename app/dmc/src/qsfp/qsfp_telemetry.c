@@ -36,6 +36,8 @@ static uint32_t qsfp_probe(bool log_discovery)
 		int ident_ret;
 
 		if (i2c_reg_read_byte(bus, cage->expander_addr, TCA9554_REG_INPUT, &pins) != 0) {
+			qsfp_dom_cache_invalidate(i);
+			last_identifier[i] = 0;
 			if (log_discovery) {
 				LOG_WRN("QSFP %s: expander 0x%02x absent", cage->name,
 					cage->expander_addr);
