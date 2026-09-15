@@ -25,6 +25,8 @@ config TT_QSFP
 
 config TT_QSFP_DISCOVERY
 	bool
+	depends on I2C
+	depends on "$(BOARD_REVISION)" = "p150a"
 	select TT_QSFP
 	help
 	  Deprecated compatibility symbol. Use CONFIG_TT_QSFP.
