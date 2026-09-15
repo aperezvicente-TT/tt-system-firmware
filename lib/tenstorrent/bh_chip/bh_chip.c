@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <stddef.h>
 #include <string.h>
 
 #include <tenstorrent/jtag_bootrom.h>
@@ -15,7 +14,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/clock.h>
 #include <zephyr/drivers/i2c.h>
-#include <string.h>
 
 LOG_MODULE_REGISTER(bh_chip, CONFIG_TT_BH_CHIP_LOG_LEVEL);
 
@@ -83,17 +81,20 @@ int bh_chip_set_static_info(struct bh_chip *chip, dmStaticInfo *info)
 	info->arc_start_time = chip->data.arc_start_time;
 	info->dm_init_duration = chip->data.dm_init_done - jtag_bootrom_get_perst_start_time();
 	info->arc_hang_pc = chip->data.arc_hang_pc;
-	/*
-	 * P150A sends the qsfp_status trailer. Other DMC builds keep the
-	 * legacy 24-byte payload so a mixed flash with older SMC still works.
-	 */
 	ret = bharc_smbus_block_write(&chip->config.arc, CMFW_SMBUS_DM_STATIC_INFO,
-				      IS_ENABLED(CONFIG_TT_QSFP)
-					      ? sizeof(dmStaticInfo)
-					      : offsetof(dmStaticInfo, qsfp_status),
-				      (uint8_t *)info);
+				      sizeof(dmStaticInfo), (uint8_t *)info);
 
 	return ret;
+}
+
+int bh_chip_set_qsfp_status(struct bh_chip *chip, uint32_t status)
+{
+	/*
+	 * Older SMCs do not implement this command. Callers must treat a
+	 * NACK as "QSFP telemetry unavailable", not as a failed DMC init.
+	 */
+	return bharc_smbus_block_write(&chip->config.arc, CMFW_SMBUS_QSFP_STATUS, sizeof(status),
+				       (uint8_t *)&status);
 }
 
 int bh_chip_set_input_power(struct bh_chip *chip, uint16_t power)

@@ -113,6 +113,14 @@
  * <td>Read data to verify the SMC got this ping request</td>
  * </tr>
  * <tr>
+ * <td>@ref CMFW_SMBUS_QSFP_MGMT_RESPONSE</td><td>0x2B</td><td>WO</td>
+ * <td>Completed QSFP-DD management response from DMC</td>
+ * </tr>
+ * <tr>
+ * <td>@ref CMFW_SMBUS_QSFP_STATUS</td><td>0x2C</td><td>WO</td>
+ * <td>Per-cage QSFP-DD discovery status for TAG_QSFP_STATUS</td>
+ * </tr>
+ * <tr>
  * <td>@ref CMFW_SMBUS_TEST_READ</td><td>0xD8</td><td>RO</td>
  * <td>Test read from CMFW scratch register</td>
  * </tr>
@@ -210,17 +218,17 @@ enum CMFWSMBusReg {
 	/**
 	 * @brief Write dmStaticInfo struct including DMFW version.
 	 *
-	 * Input (28 bytes, little-endian), a @ref dmStaticInfo of seven uint32 fields:
+	 * Input (24 bytes, little-endian), a @ref dmStaticInfo of six uint32 fields:
 	 * - bytes 0-3:   version (must be non-zero, else the write is rejected).
 	 * - bytes 4-7:   bl_version (bootloader version).
 	 * - bytes 8-11:  app_version (application version).
 	 * - bytes 12-15: arc_start_time (timestamp in ASIC refclk @ 50 MHz).
 	 * - bytes 16-19: dm_init_duration (duration in DMC refclk @ 64 MHz).
 	 * - bytes 20-23: arc_hang_pc (PC of last ARC hang; recorded only if non-zero).
-	 * - bytes 24-27: qsfp_status (one discovery byte per QSFP-DD cage).
 	 *
-	 * For compatibility, the SMC also accepts the legacy 24-byte form and
-	 * leaves TAG_QSFP_STATUS unchanged.
+	 * QSFP-DD cage status is not part of this payload. New DMCs publish it
+	 * with @ref CMFW_SMBUS_QSFP_STATUS so a mixed flash with an older SMC
+	 * still accepts this command.
 	 */
 	CMFW_SMBUS_DM_STATIC_INFO = 0x20,
 	/**
@@ -309,6 +317,13 @@ enum CMFWSMBusReg {
 	 * token and returns it to the host request waiting on TT_SMC_MSG_QSFP_MGMT.
 	 */
 	CMFW_SMBUS_QSFP_MGMT_RESPONSE = 0x2B,
+	/**
+	 * @brief Per-cage QSFP-DD discovery status.
+	 *
+	 * Input (4 bytes, little-endian): packed TAG_QSFP_STATUS word (one
+	 * discovery byte per cage). Older SMCs do not implement this command.
+	 */
+	CMFW_SMBUS_QSFP_STATUS = 0x2C,
 	/**
 	 * @brief Test read from CMFW scratch register.
 	 *

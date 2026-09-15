@@ -274,6 +274,23 @@ int32_t Dm2CmQsfpMgmtResponseHandler(const uint8_t *data, uint8_t size)
 	return 0;
 }
 
+int32_t Dm2CmQsfpStatusHandler(const uint8_t *data, uint8_t size)
+{
+#ifndef CONFIG_TT_SMC_RECOVERY
+	uint32_t status;
+
+	if (size != sizeof(status)) {
+		return -1;
+	}
+
+	memcpy(&status, data, sizeof(status));
+	UpdateTelemetryQsfp(status);
+	return 0;
+#endif
+
+	return -1;
+}
+
 static uint8_t qsfp_mgmt_handler(const union request *request, struct response *response)
 {
 	BUILD_ASSERT(sizeof(struct qsfp_mgmt_response) <=
@@ -367,16 +384,7 @@ REGISTER_MESSAGE(TT_SMC_MSG_SET_WDT_TIMEOUT, set_watchdog_timeout);
 int32_t Dm2CmSendDataHandler(const uint8_t *data, uint8_t size)
 {
 #ifndef CONFIG_TT_SMC_RECOVERY
-	/*
-	 * Accept both the current struct and the legacy layout that predates
-	 * qsfp_status. A DMC running older firmware sends the shorter struct;
-	 * still honor its fw versions / timing instead of dropping all DM
-	 * telemetry on a size mismatch. qsfp_status is only present in the
-	 * full-size message.
-	 */
-	bool has_qsfp = (size == sizeof(dmStaticInfo));
-
-	if (size != sizeof(dmStaticInfo) && size != offsetof(dmStaticInfo, qsfp_status)) {
+	if (size != sizeof(dmStaticInfo)) {
 		return -1;
 	}
 
@@ -384,9 +392,6 @@ int32_t Dm2CmSendDataHandler(const uint8_t *data, uint8_t size)
 
 	if (info->version != 0) {
 		UpdateDmFwVersion(info->bl_version, info->app_version);
-		if (has_qsfp) {
-			UpdateTelemetryQsfp(info->qsfp_status);
-		}
 		WriteReg(ARC_START_TIME_REG_ADDR, info->arc_start_time);
 		WriteReg(PERST_TO_DMFW_INIT_DONE_REG_ADDR, info->dm_init_duration);
 		if (info->arc_hang_pc != 0) {

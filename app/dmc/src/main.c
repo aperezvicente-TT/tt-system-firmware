@@ -60,8 +60,8 @@ static const struct device *const max6639_sensor_dev =
 	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(max6639_sensor));
 
 /* No mechanism for getting bl version... yet */
-static dmStaticInfo static_info = {
-	.version = 1, .bl_version = 0, .app_version = APPVERSION, .qsfp_status = 0};
+static dmStaticInfo static_info = {.version = 1, .bl_version = 0, .app_version = APPVERSION};
+static uint32_t qsfp_status;
 
 static uint16_t max_power;
 
@@ -584,6 +584,10 @@ static void send_init_data(void)
 			    bh_chip_set_therm_trip_count(chip, chip->data.therm_trip_count) == 0 &&
 			    bh_chip_run_smbus_tests(chip) == 0) {
 				chip->data.arc_needs_init_msg = false;
+				if (IS_ENABLED(CONFIG_TT_QSFP)) {
+					/* Best-effort: older SMCs NACK this command. */
+					(void)bh_chip_set_qsfp_status(chip, qsfp_status);
+				}
 			}
 		}
 	}
@@ -684,14 +688,14 @@ static void qsfp_publish_status(void)
 	}
 
 	st = qsfp_poll();
-	if (st == static_info.qsfp_status) {
+	if (st == qsfp_status) {
 		return;
 	}
 
-	LOG_INF("QSFP: telemetry 0x%08x -> 0x%08x", static_info.qsfp_status, st);
-	static_info.qsfp_status = st;
+	LOG_INF("QSFP: telemetry 0x%08x -> 0x%08x", qsfp_status, st);
+	qsfp_status = st;
 	ARRAY_FOR_EACH_BH_CHIP(chip) {
-		ret = bh_chip_set_static_info(chip, &static_info);
+		ret = bh_chip_set_qsfp_status(chip, qsfp_status);
 		if (ret != 0) {
 			LOG_WRN("QSFP: failed to publish telemetry to SMC: %d", ret);
 		}
@@ -808,11 +812,11 @@ int main(void)
 	 * use of MCU_I2C0 (shared with the SMC SMBus target).
 	 */
 	if (IS_ENABLED(CONFIG_TT_QSFP)) {
-		/* Captured into the DMC static-info message so the SMC exposes it as
-		 * telemetry TAG_QSFP_STATUS (readable from the host over PCIe). Runs
-		 * before send_init_data() in the loop below, so the value is ready.
+		/* Captured separately from dmStaticInfo so a mixed flash with
+		 * an older SMC still accepts the 24-byte static-info write.
+		 * send_init_data() then publishes this via CMFW_SMBUS_QSFP_STATUS.
 		 */
-		static_info.qsfp_status = qsfp_discover();
+		qsfp_status = qsfp_discover();
 	}
 
 	k_timer_start(&shared_20ms_event_timer, K_MSEC(20), K_MSEC(20));
