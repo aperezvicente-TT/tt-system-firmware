@@ -85,12 +85,15 @@ static int qsfp_mgmt_status(const struct device *bus, uint8_t cage,
 	} else {
 		uint8_t state;
 
-		if (qsfp_ident_cmis(data.identifier) &&
-		    i2c_reg_read_byte(bus, QSFP_MODULE_I2C_ADDR, CMIS_MODULE_STATE_OFF, &state) ==
-			    0) {
-			data.module_state = (state & CMIS_MODULE_STATE_MASK) >> 1;
-		}
 		ret = QSFP_MGMT_OK;
+		if (qsfp_ident_cmis(data.identifier)) {
+			if (i2c_reg_read_byte(bus, QSFP_MODULE_I2C_ADDR, CMIS_MODULE_STATE_OFF,
+					      &state) != 0) {
+				ret = QSFP_MGMT_ERR_I2C;
+			} else {
+				data.module_state = (state & CMIS_MODULE_STATE_MASK) >> 1;
+			}
+		}
 	}
 	qsfp_deselect(bus, cage);
 	qsfp_response_copy(response, &data, sizeof(data));
