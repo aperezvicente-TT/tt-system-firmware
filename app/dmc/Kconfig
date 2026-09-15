@@ -10,7 +10,7 @@ config DMC_RUN_SMBUS_TESTS
 config TT_QSFP
 	bool "QSFP-DD cage management"
 	depends on I2C
-	depends on $(BOARD_REVISION) = "p150a"
+	depends on "$(BOARD_REVISION)" = "p150a"
 	default y
 	help
 	  P150A only. At DMC boot, enable FXMA2102 U1 (MCU_CONN_I2C_EN) and
