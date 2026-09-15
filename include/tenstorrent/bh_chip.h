@@ -51,6 +51,8 @@ struct bh_chip_data {
 
 	/* TAG_QSFP_STATUS has not been accepted by this SMC yet. */
 	bool qsfp_status_pending;
+	/* SMC NACKed CMFW_SMBUS_QSFP_STATUS; do not retry on this flash. */
+	bool qsfp_status_unsupported;
 
 	unsigned int bus_cancel_flag;
 

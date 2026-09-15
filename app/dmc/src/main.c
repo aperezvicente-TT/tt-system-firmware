@@ -585,9 +585,18 @@ static void send_init_data(void)
 			    bh_chip_run_smbus_tests(chip) == 0) {
 				chip->data.arc_needs_init_msg = false;
 				if (IS_ENABLED(CONFIG_TT_QSFP)) {
+					chip->data.qsfp_status_unsupported = false;
 					chip->data.qsfp_status_pending = true;
 					if (bh_chip_set_qsfp_status(chip, qsfp_status) == 0) {
 						chip->data.qsfp_status_pending = false;
+					} else {
+						/*
+						 * Other init SMBus commands just succeeded, so
+						 * a NACK here is an older SMC without 0x2C.
+						 */
+						chip->data.qsfp_status_unsupported = true;
+						chip->data.qsfp_status_pending = false;
+						LOG_INF("QSFP: SMC has no QSFP status command");
 					}
 				}
 			}
@@ -695,7 +704,9 @@ static void qsfp_publish_status(void)
 		LOG_INF("QSFP: telemetry 0x%08x -> 0x%08x", qsfp_status, st);
 		qsfp_status = st;
 		ARRAY_FOR_EACH_BH_CHIP(chip) {
-			chip->data.qsfp_status_pending = true;
+			if (!chip->data.qsfp_status_unsupported) {
+				chip->data.qsfp_status_pending = true;
+			}
 		}
 	}
 
@@ -710,7 +721,7 @@ static void qsfp_publish_status(void)
 	}
 
 	ARRAY_FOR_EACH_BH_CHIP(chip) {
-		if (!chip->data.qsfp_status_pending) {
+		if (!chip->data.qsfp_status_pending || chip->data.arc_needs_init_msg) {
 			continue;
 		}
 		ret = bh_chip_set_qsfp_status(chip, qsfp_status);
