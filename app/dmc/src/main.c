@@ -693,13 +693,14 @@ static void qsfp_publish_status(void)
 	}
 
 	LOG_INF("QSFP: telemetry 0x%08x -> 0x%08x", qsfp_status, st);
-	qsfp_status = st;
 	ARRAY_FOR_EACH_BH_CHIP(chip) {
-		ret = bh_chip_set_qsfp_status(chip, qsfp_status);
+		ret = bh_chip_set_qsfp_status(chip, st);
 		if (ret != 0) {
 			LOG_WRN("QSFP: failed to publish telemetry to SMC: %d", ret);
+			return;
 		}
 	}
+	qsfp_status = st;
 }
 
 int main(void)
