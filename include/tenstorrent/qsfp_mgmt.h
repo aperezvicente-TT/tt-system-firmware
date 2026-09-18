@@ -76,8 +76,14 @@ enum qsfp_inventory_field {
 	QSFP_INV_DATE_CODE,
 	QSFP_INV_CONNECTOR,
 	QSFP_INV_MEDIA_TYPE,
-	/* Eight AppSel host/media ID pairs from CMIS lower page bytes 86-117. */
+	/*
+	 * The eight CMIS application descriptors at lower page bytes 86-117 are
+	 * four bytes each, which does not fit one QSFP_MGMT_PAYLOAD_SIZE reply,
+	 * so they are split: APPLICATIONS carries the host/media ID pairs and
+	 * APP_LANES the lane-count and host-lane-assignment pairs.
+	 */
 	QSFP_INV_APPLICATIONS,
+	QSFP_INV_APP_LANES,
 	QSFP_INV_COUNT,
 };
 

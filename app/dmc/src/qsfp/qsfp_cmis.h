@@ -47,6 +47,8 @@ static inline bool qsfp_ident_cmis(uint8_t identifier)
 #define CMIS_P00_DATE_OFF        54
 #define CMIS_P00_DATE_LEN        8
 #define CMIS_P00_CONNECTOR_OFF   75
+/* Media Type Encoding is lower memory; upper page 00h byte 0 is the Identifier. */
+#define CMIS_MEDIA_TYPE_OFF      85
 #define CMIS_APP_DESC_OFF        86
 #define CMIS_APP_DESC_COUNT      8
 #define CMIS_APP_DESC_LEN        4

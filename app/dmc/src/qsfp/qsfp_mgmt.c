@@ -123,15 +123,21 @@ static int qsfp_mgmt_inventory(const struct device *bus, uint8_t cage, uint8_t f
 			src = lower;
 			len = sizeof(lower);
 		}
-	} else if (field == QSFP_INV_APPLICATIONS) {
+	} else if (field == QSFP_INV_MEDIA_TYPE) {
+		if (qsfp_cmis_read(bus, CMIS_MEDIA_TYPE_OFF, lower, 1) == 0) {
+			src = lower;
+			len = 1;
+		}
+	} else if (field == QSFP_INV_APPLICATIONS || field == QSFP_INV_APP_LANES) {
 		uint8_t descriptors[CMIS_APP_DESC_COUNT * CMIS_APP_DESC_LEN];
 		uint8_t packed[CMIS_APP_DESC_COUNT * 2];
+		uint8_t half = (field == QSFP_INV_APPLICATIONS) ? 0U : 2U;
 		uint8_t i;
 
 		if (qsfp_cmis_read(bus, CMIS_APP_DESC_OFF, descriptors, sizeof(descriptors)) == 0) {
 			for (i = 0; i < CMIS_APP_DESC_COUNT; i++) {
-				packed[2U * i] = descriptors[CMIS_APP_DESC_LEN * i];
-				packed[2U * i + 1U] = descriptors[CMIS_APP_DESC_LEN * i + 1U];
+				packed[2U * i] = descriptors[CMIS_APP_DESC_LEN * i + half];
+				packed[2U * i + 1U] = descriptors[CMIS_APP_DESC_LEN * i + half + 1U];
 			}
 			memcpy(upper, packed, sizeof(packed));
 			src = upper;
@@ -165,10 +171,6 @@ static int qsfp_mgmt_inventory(const struct device *bus, uint8_t cage, uint8_t f
 			break;
 		case QSFP_INV_CONNECTOR:
 			src = &upper[CMIS_P00_CONNECTOR_OFF];
-			len = 1;
-			break;
-		case QSFP_INV_MEDIA_TYPE:
-			src = &upper[0];
 			len = 1;
 			break;
 		default:
