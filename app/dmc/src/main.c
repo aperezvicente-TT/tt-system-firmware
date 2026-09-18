@@ -592,7 +592,8 @@ static void send_init_data(void)
 					} else {
 						/*
 						 * Other init SMBus commands just succeeded, so
-						 * a NACK here is an older SMC without 0x2C.
+						 * a NACK here means this SMC has no QSFP status
+						 * command.
 						 */
 						chip->data.qsfp_status_unsupported = true;
 						chip->data.qsfp_status_pending = false;
@@ -843,9 +844,9 @@ int main(void)
 	 * use of MCU_I2C0 (shared with the SMC SMBus target).
 	 */
 	if (IS_ENABLED(CONFIG_TT_QSFP)) {
-		/* Captured separately from dmStaticInfo so a mixed flash with
-		 * an older SMC still accepts the 24-byte static-info write.
-		 * send_init_data() then publishes this via CMFW_SMBUS_QSFP_STATUS.
+		/* Captured separately from dmStaticInfo so an SMC that lacks
+		 * CMFW_SMBUS_QSFP_STATUS still accepts the 24-byte static-info
+		 * write. send_init_data() then publishes this via that command.
 		 */
 		qsfp_status = qsfp_discover();
 	}

@@ -226,9 +226,9 @@ enum CMFWSMBusReg {
 	 * - bytes 16-19: dm_init_duration (duration in DMC refclk @ 64 MHz).
 	 * - bytes 20-23: arc_hang_pc (PC of last ARC hang; recorded only if non-zero).
 	 *
-	 * QSFP-DD cage status is not part of this payload. New DMCs publish it
-	 * with @ref CMFW_SMBUS_QSFP_STATUS so a mixed flash with an older SMC
-	 * still accepts this command.
+	 * QSFP-DD cage status is not part of this payload. The DMC publishes it
+	 * with @ref CMFW_SMBUS_QSFP_STATUS so an SMC that lacks that command
+	 * still accepts this 24-byte write.
 	 */
 	CMFW_SMBUS_DM_STATIC_INFO = 0x20,
 	/**
@@ -321,7 +321,8 @@ enum CMFWSMBusReg {
 	 * @brief Per-cage QSFP-DD discovery status.
 	 *
 	 * Input (4 bytes, little-endian): packed TAG_QSFP_STATUS word (one
-	 * discovery byte per cage). Older SMCs do not implement this command.
+	 * discovery byte per cage). An SMC that does not implement this
+	 * command NACKs the write.
 	 */
 	CMFW_SMBUS_QSFP_STATUS = 0x2C,
 	/**
