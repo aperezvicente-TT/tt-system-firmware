@@ -494,15 +494,23 @@ typedef union {
  */
 #define TAG_FLASH_JEDEC_ID 80
 
-/** @brief QSFP-DD cage discovery status (P150a).
+/** @brief QSFP cage discovery status.
  *
- * One byte per cage, byte 0 = cage A ... byte 3 = cage D. Per-cage byte:
- *   0x00        expander absent (no I2C response)
- *   0x01        expander present, no module seated
- *   0x02        module seated, identifier read at 0x50 failed
- *   0x03        MCU_I2C0 stuck (all four bytes)
- *   0x80 | id   module present; id = SFF-8024 identifier byte
- * Populated by the DMC's qsfp_discover(); 0 if CONFIG_TT_QSFP is off.
+ * Present on every board. Remains 0 if the DMC never publishes
+ * CMFW_SMBUS_QSFP_STATUS.
+ *
+ * Packed little-endian: one byte per cage, byte 0 = cage A ... byte 3 = D.
+ *
+ * Per-cage byte:
+ *   bit 7     present flag (QSFP_TELEM_PRESENT_FLAG)
+ *   bits 6:0  SFF-8024 identifier when present (7 bits)
+ *
+ * Not-present codes (bit 7 clear):
+ *   0x00  expander absent (no I2C ACK)
+ *   0x01  expander present, no module seated
+ *   0x02  module seated, identifier read at 0x50 failed
+ *   0x03  bus stuck (all four bytes set)
+ *   0x04-0x7F reserved. Hosts must treat unknown values as not present.
  */
 #define TAG_QSFP_STATUS 81
 
