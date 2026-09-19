@@ -59,6 +59,7 @@ static int qsfp_require_module(const struct device *bus, uint8_t cage, uint8_t *
 		return QSFP_MGMT_ERR_I2C;
 	}
 	if ((*pins & QSFP_BIT_MODPRSL) != 0) {
+		qsfp_dom_cache_invalidate(cage);
 		return QSFP_MGMT_ERR_ABSENT;
 	}
 	return QSFP_MGMT_OK;
@@ -77,14 +78,22 @@ static int qsfp_mgmt_status(const struct device *bus, uint8_t cage,
 		return ret;
 	}
 	if (ret != 0 || qsfp_select(bus, cage) != 0) {
+		qsfp_dom_cache_invalidate(cage);
 		return QSFP_MGMT_ERR_I2C;
 	}
 	k_msleep(1);
 	if (qsfp_cmis_read_identity(bus, &data.identifier, &data.revision) != 0) {
+		qsfp_dom_cache_invalidate(cage);
 		ret = QSFP_MGMT_ERR_I2C;
 	} else {
 		uint8_t state;
 
+		/*
+		 * Host STATUS can observe a newly seated or replaced module before
+		 * the periodic poll runs. Drop cached DOM caps so the next DOM_*
+		 * call re-reads this module's monitor capabilities.
+		 */
+		qsfp_dom_cache_invalidate(cage);
 		ret = QSFP_MGMT_OK;
 		if (qsfp_ident_cmis(data.identifier)) {
 			if (i2c_reg_read_byte(bus, QSFP_MODULE_I2C_ADDR, CMIS_MODULE_STATE_OFF,
@@ -108,13 +117,17 @@ static int qsfp_mgmt_inventory(const struct device *bus, uint8_t cage, uint8_t f
 	uint8_t pins;
 	const uint8_t *src = NULL;
 	size_t len = 0;
-	int ret = qsfp_require_module(bus, cage, &pins);
+	int ret;
 
+	if (field >= QSFP_INV_COUNT) {
+		return QSFP_MGMT_ERR_ARGUMENT;
+	}
+	ret = qsfp_require_module(bus, cage, &pins);
 	if (ret != 0) {
 		return ret;
 	}
-	if (field >= QSFP_INV_COUNT || qsfp_select(bus, cage) != 0) {
-		return field >= QSFP_INV_COUNT ? QSFP_MGMT_ERR_ARGUMENT : QSFP_MGMT_ERR_I2C;
+	if (qsfp_select(bus, cage) != 0) {
+		return QSFP_MGMT_ERR_I2C;
 	}
 	k_msleep(1);
 
@@ -137,7 +150,8 @@ static int qsfp_mgmt_inventory(const struct device *bus, uint8_t cage, uint8_t f
 		if (qsfp_cmis_read(bus, CMIS_APP_DESC_OFF, descriptors, sizeof(descriptors)) == 0) {
 			for (i = 0; i < CMIS_APP_DESC_COUNT; i++) {
 				packed[2U * i] = descriptors[CMIS_APP_DESC_LEN * i + half];
-				packed[2U * i + 1U] = descriptors[CMIS_APP_DESC_LEN * i + half + 1U];
+				packed[2U * i + 1U] =
+					descriptors[CMIS_APP_DESC_LEN * i + half + 1U];
 			}
 			memcpy(upper, packed, sizeof(packed));
 			src = upper;
@@ -245,7 +259,7 @@ static int qsfp_mgmt_dom_module(const struct device *bus, uint8_t cage,
 				struct qsfp_mgmt_response *response)
 {
 	struct qsfp_dom_module dom = {0};
-	uint8_t lower[18];
+	uint8_t lower[28];
 	uint8_t pins;
 	int ret = qsfp_require_module(bus, cage, &pins);
 
@@ -258,11 +272,17 @@ static int qsfp_mgmt_dom_module(const struct device *bus, uint8_t cage,
 	if (ret != 0) {
 		return QSFP_MGMT_ERR_I2C;
 	}
-	dom.temperature_256c = (int16_t)sys_get_be16(&lower[14]);
-	dom.vcc_100uv = sys_get_be16(&lower[16]);
-	dom.module_state = 0;
-	if (qsfp_ident_cmis(lower[0])) {
+	if (qsfp_ident_sff8636(lower[0])) {
+		/* SFF-8636: temp @22-23, Vcc @26-27 (CMIS uses 14-17). */
+		dom.temperature_256c = (int16_t)sys_get_be16(&lower[22]);
+		dom.vcc_100uv = sys_get_be16(&lower[26]);
+		dom.module_state = 0;
+	} else if (qsfp_ident_cmis(lower[0])) {
+		dom.temperature_256c = (int16_t)sys_get_be16(&lower[14]);
+		dom.vcc_100uv = sys_get_be16(&lower[16]);
 		dom.module_state = (lower[3] & CMIS_MODULE_STATE_MASK) >> 1;
+	} else {
+		return QSFP_MGMT_ERR_UNAVAILABLE;
 	}
 	dom.low_power = (qsfp_output_shadow[cage] & QSFP_BIT_LPMODE) != 0;
 	dom.interrupt_asserted = (pins & QSFP_BIT_INTL) == 0;

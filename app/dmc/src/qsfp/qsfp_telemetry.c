@@ -21,7 +21,6 @@ static uint32_t qsfp_probe(bool log_discovery)
 	const struct device *bus = qsfp_session_begin();
 	uint32_t status = 0;
 	uint8_t responsive = 0;
-	static uint8_t last_identifier[QSFP_CAGE_COUNT];
 
 	if (bus == NULL) {
 		LOG_ERR("QSFP: i2c3 (MCU_I2C0) not ready, skipping discovery");
@@ -37,7 +36,6 @@ static uint32_t qsfp_probe(bool log_discovery)
 
 		if (i2c_reg_read_byte(bus, cage->expander_addr, TCA9554_REG_INPUT, &pins) != 0) {
 			qsfp_dom_cache_invalidate(i);
-			last_identifier[i] = 0;
 			if (log_discovery) {
 				LOG_WRN("QSFP %s: expander 0x%02x absent", cage->name,
 					cage->expander_addr);
@@ -48,7 +46,6 @@ static uint32_t qsfp_probe(bool log_discovery)
 
 		if ((pins & QSFP_BIT_MODPRSL) != 0) {
 			qsfp_dom_cache_invalidate(i);
-			last_identifier[i] = 0;
 			status |= (uint32_t)QSFP_TELEM_NO_MODULE << (8 * i);
 			if (log_discovery) {
 				LOG_INF("QSFP %s: expander 0x%02x present, no module", cage->name,
@@ -60,7 +57,6 @@ static uint32_t qsfp_probe(bool log_discovery)
 		if (qsfp_select(bus, i) != 0) {
 			qsfp_deselect(bus, i);
 			qsfp_dom_cache_invalidate(i);
-			last_identifier[i] = 0;
 			status |= (uint32_t)QSFP_TELEM_CMIS_READ_FAILED << (8 * i);
 			if (log_discovery) {
 				LOG_WRN("QSFP %s: module seated, select failed", cage->name);
@@ -73,7 +69,6 @@ static uint32_t qsfp_probe(bool log_discovery)
 
 		if (ident_ret != 0) {
 			qsfp_dom_cache_invalidate(i);
-			last_identifier[i] = 0;
 			status |= (uint32_t)QSFP_TELEM_CMIS_READ_FAILED << (8 * i);
 			if (log_discovery) {
 				LOG_WRN("QSFP %s: module seated, identifier read failed",
@@ -82,10 +77,12 @@ static uint32_t qsfp_probe(bool log_discovery)
 			continue;
 		}
 
-		if (last_identifier[i] != identifier) {
-			qsfp_dom_cache_invalidate(i);
-			last_identifier[i] = identifier;
-		}
+		/*
+		 * Many CMIS modules share identifier 0x18. Always drop the DOM
+		 * capability cache when a present module is observed so a
+		 * same-id hot-swap cannot reuse the previous bias/monitor flags.
+		 */
+		qsfp_dom_cache_invalidate(i);
 
 		status |= (uint32_t)QSFP_TELEM_PRESENT_ID(identifier) << (8 * i);
 		if (log_discovery) {

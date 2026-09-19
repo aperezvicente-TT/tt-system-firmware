@@ -99,13 +99,30 @@ void update_fan_speed(bool notify_smcs)
 	}
 }
 
+static void qsfp_isolate_bus(void)
+{
+	if (IS_ENABLED(CONFIG_TT_QSFP)) {
+		qsfp_emergency_park();
+		qsfp_hold_translator_off();
+	}
+}
+
+static void qsfp_restore_bus(void)
+{
+	if (IS_ENABLED(CONFIG_TT_QSFP)) {
+		qsfp_enable_translator();
+	}
+}
+
 static bool process_reset_req(struct bh_chip *chip, uint8_t msg_id, uint32_t msg_data)
 {
 	switch (msg_data) {
 	case kCm2DmResetLevelAsic:
 		LOG_INF("Received ARC reset request");
 		bh_chip_cancel_bus_transfer_clear(chip);
+		qsfp_isolate_bus();
 		bh_chip_reset_chip(chip, true);
+		qsfp_restore_bus();
 		break;
 
 	case kCm2DmResetLevelDmc:
@@ -461,10 +478,7 @@ static void handle_therm_trip(void)
 				 * think I'm happy to eat the non-enum in that case
 				 */
 				chip->data.performing_reset = true;
-				if (IS_ENABLED(CONFIG_TT_QSFP)) {
-					qsfp_emergency_park();
-					qsfp_hold_translator_off();
-				}
+				qsfp_isolate_bus();
 				/* Set the bus cancel following the logic of
 				 * (reset_triggered && !performing_reset)
 				 */
@@ -472,9 +486,7 @@ static void handle_therm_trip(void)
 
 				chip->data.therm_trip_count++;
 				bh_chip_reset_chip(chip, true);
-				if (IS_ENABLED(CONFIG_TT_QSFP)) {
-					qsfp_enable_translator();
-				}
+				qsfp_restore_bus();
 
 				/* Set the bus cancel following the logic of
 				 * (reset_triggered && !performing_reset)
@@ -512,14 +524,9 @@ static void handle_watchdog_reset(void)
 			}
 
 			chip->data.performing_reset = true;
-			if (IS_ENABLED(CONFIG_TT_QSFP)) {
-				qsfp_emergency_park();
-				qsfp_hold_translator_off();
-			}
+			qsfp_isolate_bus();
 			bh_chip_reset_chip(chip, true);
-			if (IS_ENABLED(CONFIG_TT_QSFP)) {
-				qsfp_enable_translator();
-			}
+			qsfp_restore_bus();
 			/* Clear bus transfer cancel flag */
 			bh_chip_cancel_bus_transfer_clear(chip);
 
@@ -533,10 +540,7 @@ static void handle_perst(void)
 	ARRAY_FOR_EACH_BH_CHIP(chip) {
 		if (atomic_set(&chip->data.trigger_reset, false)) {
 			chip->data.performing_reset = true;
-			if (IS_ENABLED(CONFIG_TT_QSFP)) {
-				qsfp_emergency_park();
-				qsfp_hold_translator_off();
-			}
+			qsfp_isolate_bus();
 			chip->data.last_cm2dm_seq_num_valid = false;
 			/*
 			 * Set the bus cancel following the logic of (reset_triggered &&
@@ -550,9 +554,7 @@ static void handle_perst(void)
 			jtag_bootrom_soft_reset_arc(chip);
 			jtag_bootrom_teardown(chip);
 			bharc_enable_i2cbus(&chip->config.arc);
-			if (IS_ENABLED(CONFIG_TT_QSFP)) {
-				qsfp_enable_translator();
-			}
+			qsfp_restore_bus();
 
 			/*
 			 * Set the bus cancel following the logic of (reset_triggered &&
@@ -571,7 +573,19 @@ static void handle_perst(void)
 static void handle_pgood_change(void)
 {
 	ARRAY_FOR_EACH_BH_CHIP(chip) {
+		/*
+		 * PGOOD rise runs bh_chip_reset_chip(); isolate cages first so
+		 * MCU_I2C0 is not shared during the ASIC bring-up sequence.
+		 */
+		bool isolate = chip->data.pgood_rise_triggered && !chip->data.pgood_severe_fault;
+
+		if (isolate) {
+			qsfp_isolate_bus();
+		}
 		handle_pgood_event(chip, board_fault_led);
+		if (isolate) {
+			qsfp_restore_bus();
+		}
 	}
 }
 

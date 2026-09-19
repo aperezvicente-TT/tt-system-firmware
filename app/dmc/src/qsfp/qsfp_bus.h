@@ -44,7 +44,9 @@ int qsfp_write_output(const struct device *bus, uint8_t cage, uint8_t value);
 int qsfp_select(const struct device *bus, uint8_t cage);
 void qsfp_deselect(const struct device *bus, uint8_t cage);
 
-/* Capability cache in qsfp_mgmt.c; clear when a module leaves or is reset. */
+/* Capability cache in qsfp_mgmt.c; clear when a module leaves, is reset, or
+ * may have been replaced (same SFF-8024 identifier is common across CMIS SKUs).
+ */
 void qsfp_dom_cache_invalidate(uint8_t cage);
 
 #endif /* APP_DMC_QSFP_BUS_H_ */
