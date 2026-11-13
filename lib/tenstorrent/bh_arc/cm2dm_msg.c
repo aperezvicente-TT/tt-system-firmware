@@ -12,6 +12,7 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <zephyr/devicetree.h>
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/watchdog.h>
 #include <zephyr/drivers/uart.h>
@@ -299,6 +300,11 @@ static uint8_t qsfp_mgmt_handler(const union request *request, struct response *
 	uint8_t token;
 	uint32_t data;
 	int ret;
+
+	/* Boards without a DMC (Galaxy) have nothing to forward the request to. */
+	if (!DT_NODE_EXISTS(DT_NODELABEL(dmfw))) {
+		return QSFP_MGMT_ERR_UNAVAILABLE;
+	}
 
 	if (request->qsfp_mgmt.operation >= QSFP_MGMT_OP_COUNT ||
 	    request->qsfp_mgmt.cage >= QSFP_CAGE_COUNT) {

@@ -16,7 +16,13 @@ extern "C" {
 
 #define QSFP_CAGE_COUNT          4U
 #define QSFP_MGMT_PAYLOAD_SIZE   20U
-#define QSFP_MGMT_SMC_TIMEOUT_MS 5000U
+/*
+ * The SMC waits for the DMC on the shared system workqueue, and must stay well
+ * under the KMD message timeout when no DMC answers (DMC absent, or an old DMC
+ * that predates QSFP management). The slowest DMC operation, a DOM lane read,
+ * finishes in well under this.
+ */
+#define QSFP_MGMT_SMC_TIMEOUT_MS 200U
 
 /*
  * TAG_QSFP_STATUS contains one byte per cage (A in bits 7:0). A seated module
