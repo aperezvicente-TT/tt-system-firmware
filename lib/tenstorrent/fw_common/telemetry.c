@@ -82,6 +82,11 @@ void UpdateDmFwVersion(uint32_t bl_version, uint32_t app_version)
 	telemetry_set(TAG_DM_APP_FW_VERSION, app_version);
 }
 
+void UpdateTelemetryQsfp(uint32_t qsfp_status)
+{
+	telemetry_set(TAG_QSFP_STATUS, qsfp_status);
+}
+
 void UpdateTelemetryNocTranslation(bool translation_enabled)
 {
 	/* Note that this may be called before init_telemetry. */

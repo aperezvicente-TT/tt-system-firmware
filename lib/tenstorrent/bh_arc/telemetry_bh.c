@@ -183,6 +183,7 @@ static struct telemetry_table telemetry_table = {
 		[78] = {TAG_BOARD_ID_EXT_HIGH, TELEM_OFFSET(TAG_BOARD_ID_EXT_HIGH)},
 		[79] = {TAG_BOARD_ID_EXT_MIDDLE, TELEM_OFFSET(TAG_BOARD_ID_EXT_MIDDLE)},
 		[80] = {TAG_BOARD_ID_EXT_LOW, TELEM_OFFSET(TAG_BOARD_ID_EXT_LOW)},
+		[81] = {TAG_QSFP_STATUS, TELEM_OFFSET(TAG_QSFP_STATUS)},
 	},
 };
 /* clang-format on */
